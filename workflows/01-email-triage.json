@@ -1,0 +1,455 @@
+{
+  "name": "01 \u00b7 Email Triage (LLM)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 01 \u00b7 Email Triage\n\n**Demo (<10 min)**\n1. Import this file in n8n\n2. Attach **OpenAI** credential on *Classify Priority & Intent*\n3. Activate or click **Test workflow**\n4. POST sample JSON to the webhook URL\n\n**Inbound stub:** Webhook stands in for IMAP/Email Trigger. Swap for `Email Trigger (IMAP)` when ready.\n\n**Sample body:**\n```json\n{\n  \"from\": \"alex@example.com\",\n  \"subject\": \"Urgent: invoice overdue\",\n  \"body\": \"Please escalate \u2014 payment failed.\"\n}\n```",
+        "height": 460,
+        "width": 460,
+        "color": 4
+      },
+      "id": "be52f43c-8de0-480c-8e40-f69fde3190b8",
+      "name": "Note \u2014 Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-triage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2b06ca8c-00a2-45c7-b7f5-d14f23176e9e",
+      "name": "Inbound Email Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "fc64b2c7-d2a3-4502-884a-b54cfb4987d9",
+      "notes": "Stub for IMAP/Email Trigger. Expects JSON: from, subject, body.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8397f1d2-1ee0-4107-af7e-9cb3224464dc",
+              "name": "from",
+              "value": "={{ $json.body.from || $json.from || 'unknown@example.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "e1d9840e-c9ae-40d6-ba0c-3f6b9ad69bb0",
+              "name": "subject",
+              "value": "={{ $json.body.subject || $json.subject || '(no subject)' }}",
+              "type": "string"
+            },
+            {
+              "id": "e0a458e2-2628-4eb3-a404-685c6c2e3780",
+              "name": "body",
+              "value": "={{ $json.body.body || $json.body.text || $json.body || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f23e6612-6e29-4825-95bb-5e19407e6542",
+      "name": "Normalize Email Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You triage inbound email for an ops team. Return ONLY JSON with keys: priority (critical|high|normal|low), intent (billing|support|sales|spam|other), label (short slug), summary (1 sentence), route (escalate|support_queue|sales_queue|archive)."
+            },
+            {
+              "role": "user",
+              "content": "=From: {{ $json.from }}\nSubject: {{ $json.subject }}\n\n{{ $json.body }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 400
+        }
+      },
+      "id": "bb1c3c59-f93a-442e-bb42-689aad78d925",
+      "name": "Classify Priority & Intent",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "Map this to your OpenAI (or OpenAI-compatible) credential after import.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c0235a4b-4e28-403a-85a4-5e1a9d2a47de",
+                    "leftValue": "={{ $json.route || $json.message?.content?.route }}",
+                    "rightValue": "escalate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalate"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "949ecda4-7330-44c1-80c6-511fed6abbdd",
+                    "leftValue": "={{ $json.route || $json.message?.content?.route }}",
+                    "rightValue": "sales_queue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sales"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "d666be18-3410-4cb5-93a7-97bd637dbcf0",
+      "name": "Route by Classification",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        820,
+        300
+      ],
+      "notes": "Routes on LLM `route` field. Fallback = support/archive path.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b7494c7a-795c-4c08-a8b3-62793c77ae5f",
+              "name": "action",
+              "value": "escalated",
+              "type": "string"
+            },
+            {
+              "id": "8ccfd50f-9789-43e4-88d3-277434704539",
+              "name": "label",
+              "value": "={{ $('Classify Priority & Intent').item.json.label || 'priority-critical' }}",
+              "type": "string"
+            },
+            {
+              "id": "2b7c456c-99de-48b7-b004-2c32b6b264f5",
+              "name": "priority",
+              "value": "={{ $('Classify Priority & Intent').item.json.priority }}",
+              "type": "string"
+            },
+            {
+              "id": "8c7f2942-d0b5-4f18-b6bc-d34c2d214c01",
+              "name": "summary",
+              "value": "={{ $('Classify Priority & Intent').item.json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "43fdb3ec-317a-46ab-9200-7bc65b28831a",
+              "name": "original_from",
+              "value": "={{ $('Normalize Email Fields').item.json.from }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f409cc46-b83e-4450-b583-1741123d03e9",
+      "name": "Label \u00b7 Escalate",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2deed1b1-0779-4426-9237-fc7439e06ebc",
+              "name": "action",
+              "value": "sales_queue",
+              "type": "string"
+            },
+            {
+              "id": "cb7b07e0-5ee6-4584-bd69-3592b1135da2",
+              "name": "label",
+              "value": "={{ $('Classify Priority & Intent').item.json.label || 'sales' }}",
+              "type": "string"
+            },
+            {
+              "id": "7da7a960-cf10-449e-be78-ca7df0d039a4",
+              "name": "priority",
+              "value": "={{ $('Classify Priority & Intent').item.json.priority }}",
+              "type": "string"
+            },
+            {
+              "id": "40257293-573c-4226-b8dd-17844e092747",
+              "name": "summary",
+              "value": "={{ $('Classify Priority & Intent').item.json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "e4893d68-0737-4baa-b67e-f23fd2e4a3ed",
+              "name": "original_from",
+              "value": "={{ $('Normalize Email Fields').item.json.from }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ccdf78a3-4ab1-4aed-a48b-47adad936f55",
+      "name": "Label \u00b7 Sales Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe174a7d-25e2-42f9-9dd9-2c0c5c94b7df",
+              "name": "action",
+              "value": "support_or_archive",
+              "type": "string"
+            },
+            {
+              "id": "b659beb6-8f28-4f4c-abec-f89a23ccd4d1",
+              "name": "label",
+              "value": "={{ $('Classify Priority & Intent').item.json.label || 'support' }}",
+              "type": "string"
+            },
+            {
+              "id": "4a83a654-2886-4db1-abe9-529c77eb87b9",
+              "name": "priority",
+              "value": "={{ $('Classify Priority & Intent').item.json.priority }}",
+              "type": "string"
+            },
+            {
+              "id": "09a5e5a1-67db-4b4a-81b0-2c1e6f502521",
+              "name": "intent",
+              "value": "={{ $('Classify Priority & Intent').item.json.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "3db2f815-ddc3-406b-8ee3-4d22fefb7768",
+              "name": "summary",
+              "value": "={{ $('Classify Priority & Intent').item.json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "56f22861-0f80-4d23-925c-908e46a9fc2d",
+              "name": "original_from",
+              "value": "={{ $('Normalize Email Fields').item.json.from }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8f0da319-73bf-41f5-9b70-f212a886af6a",
+      "name": "Label \u00b7 Support / Archive",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { triage: $json, demo: true } }}",
+        "options": {}
+      },
+      "id": "9f8a713d-9946-4e28-afe6-b409f8e43bfb",
+      "name": "Respond Triage Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1380,
+        300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Inbound Email Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Email Fields": {
+      "main": [
+        [
+          {
+            "node": "Classify Priority & Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Priority & Intent": {
+      "main": [
+        [
+          {
+            "node": "Route by Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Classification": {
+      "main": [
+        [
+          {
+            "node": "Label \u00b7 Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Label \u00b7 Sales Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Label \u00b7 Support / Archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label \u00b7 Escalate": {
+      "main": [
+        [
+          {
+            "node": "Respond Triage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label \u00b7 Sales Queue": {
+      "main": [
+        [
+          {
+            "node": "Respond Triage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label \u00b7 Support / Archive": {
+      "main": [
+        [
+          {
+            "node": "Respond Triage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4b9958bd-8409-4e7a-8bc3-e5f07356d0c2",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

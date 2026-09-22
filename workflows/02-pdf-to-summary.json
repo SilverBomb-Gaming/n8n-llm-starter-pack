@@ -1,0 +1,219 @@
+{
+  "name": "02 \u00b7 PDF to Summary (LLM)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 02 \u00b7 PDF \u2192 Summary\n\n**Demo (<10 min)**\n1. Import \u00b7 attach credentials\n2. Use **Form** production/test URL to upload a PDF\n3. Or swap Form for Manual Trigger + binary sample\n\n**LLM path:** This workflow uses **HTTP Request** to an OpenAI-compatible `/v1/chat/completions` endpoint (works with OpenAI, Azure OpenAI proxy, Ollama-compat, Groq, etc.).\n\nSee `CREDENTIALS.example.md` for Header Auth setup.",
+        "height": 400,
+        "width": 480,
+        "color": 5
+      },
+      "id": "305702bb-e710-488a-bd6b-5625bd6dde34",
+      "name": "Note \u2014 Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "PDF to Markdown Summary",
+        "formDescription": "Upload a PDF. The workflow extracts text and returns an LLM summary as Markdown.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Document",
+              "fieldType": "file",
+              "requiredField": true,
+              "acceptFileTypes": ".pdf"
+            },
+            {
+              "fieldLabel": "Focus",
+              "fieldType": "text",
+              "placeholder": "e.g. risks, action items, executive summary",
+              "requiredField": false
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "0dc7a70f-851e-4433-a683-bf72a99b0796",
+      "name": "PDF Upload Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        280
+      ],
+      "webhookId": "c1ae4f4f-8457-4652-8980-1f52f46e35a1"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {},
+        "binaryPropertyName": "Document"
+      },
+      "id": "fd6d56d1-0119-4330-80dd-eccd61fb7602",
+      "name": "Extract Text from PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        280,
+        280
+      ],
+      "notes": "Binary property defaults to form field label `Document`. If extract fails, check the incoming binary key in the Form output (sometimes `Document_0`) and update this field.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0c53a36d-48c6-41d0-afc5-e76b6de5304c",
+              "name": "text",
+              "value": "={{ $json.text || $json.data || JSON.stringify($json) }}",
+              "type": "string"
+            },
+            {
+              "id": "7c5ac60f-09c7-4dce-8881-3367ecc156f2",
+              "name": "focus",
+              "value": "={{ $('PDF Upload Form').item.json.Focus || 'executive summary' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d793e5b0-f435-4274-8971-b5e9d9b00de4",
+      "name": "Prepare Extracted Text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OPENAI_BASE_URL || 'https://api.openai.com' }}/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.OPENAI_MODEL || 'gpt-4o-mini', temperature: 0.2, messages: [ { role: 'system', content: 'You summarize documents into clean Markdown. Include: title guess, 5-bullet summary, key entities, and action items. Focus: ' + $json.focus }, { role: 'user', content: ($json.text || '').slice(0, 12000) } ] }) }}",
+        "options": {}
+      },
+      "id": "a8c5988f-06fb-4aa4-9d3f-431004d9dea9",
+      "name": "LLM Summary (HTTP \u00b7 OpenAI-compatible)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        280
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "OpenAI-compatible Header Auth"
+        }
+      },
+      "notes": "Header Auth: Name=Authorization, Value=Bearer sk-... (never commit real keys). Override base URL via env OPENAI_BASE_URL.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a26c2407-d5fd-44af-b052-f02a2ef1c74c",
+              "name": "markdown",
+              "value": "={{ $json.choices?.[0]?.message?.content || $json.message?.content || 'No summary returned' }}",
+              "type": "string"
+            },
+            {
+              "id": "f88ddda4-859e-4f28-93ca-e622b67559b5",
+              "name": "model",
+              "value": "={{ $json.model || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "b8f7666a-feb9-4bbd-942a-8d50d16e44e2",
+              "name": "focus",
+              "value": "={{ $('Prepare Extracted Text').item.json.focus }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dd85e9b0-7f13-4920-8209-08852579220f",
+      "name": "Format Markdown Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1060,
+        280
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "PDF Upload Form": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text from PDF": {
+      "main": [
+        [
+          {
+            "node": "Prepare Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Extracted Text": {
+      "main": [
+        [
+          {
+            "node": "LLM Summary (HTTP \u00b7 OpenAI-compatible)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Summary (HTTP \u00b7 OpenAI-compatible)": {
+      "main": [
+        [
+          {
+            "node": "Format Markdown Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ffe0ed3e-22bd-42d7-8ce0-ed68beeca4ca",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

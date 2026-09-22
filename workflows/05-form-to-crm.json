@@ -1,0 +1,283 @@
+{
+  "name": "05 \u00b7 Form to CRM (LLM)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 05 \u00b7 Form \u2192 CRM Stub\n\n**Demo (<10 min)**\n1. Import \u00b7 attach OpenAI credential\n2. Open Form test URL, submit sample lead\n3. *HTTP \u00b7 Upsert CRM Stub* posts to https://httpbin.org/post (safe public echo)\n4. Swap URL for HubSpot/Salesforce/Attio when ready\n\nShows LLM field normalization before a generic CRM/API write.",
+        "height": 360,
+        "width": 460,
+        "color": 4
+      },
+      "id": "acc79dca-2f0f-412c-807e-78f3451a700f",
+      "name": "Note \u2014 Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Lead Capture",
+        "formDescription": "Submit a messy lead. LLM normalizes fields, then we POST to a CRM/API stub.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Raw Details",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Jane D \u2014 acme corp, jane at acme.com, interested in enterprise plan, +1 555 0100"
+            },
+            {
+              "fieldLabel": "Source",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "website / webinar / referral"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "383b3aac-1afd-418c-b17a-f8a819d6557d",
+      "name": "Lead Capture Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        280
+      ],
+      "webhookId": "b6f6b963-0e5c-4dec-99c4-1a1a4c6c7523"
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Normalize messy lead text into JSON only: {\"full_name\":\"\",\"email\":\"\",\"company\":\"\",\"phone\":\"\",\"interest\":\"\",\"source\":\"\",\"confidence\":0.0}. Use empty string when unknown. confidence 0-1."
+            },
+            {
+              "role": "user",
+              "content": "=Source hint: {{ $json.Source || 'unknown' }}\n\nRaw details:\n{{ $json['Raw Details'] || $json.Raw_Details || JSON.stringify($json) }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 400
+        }
+      },
+      "id": "4ba29fdb-e209-4c14-948a-3a498e872487",
+      "name": "LLM Normalize Lead Fields",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        280,
+        280
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "Map this to your OpenAI (or OpenAI-compatible) credential after import.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9e11d062-0a83-4028-a69e-d1e0d4febec1",
+              "name": "full_name",
+              "value": "={{ $json.full_name }}",
+              "type": "string"
+            },
+            {
+              "id": "f92b119e-4a26-4e4d-8112-09c129140a49",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "c34fec59-9221-4616-83c0-d06a72a9df37",
+              "name": "company",
+              "value": "={{ $json.company }}",
+              "type": "string"
+            },
+            {
+              "id": "475c93a5-9c88-4eeb-8e77-88c96217c3d1",
+              "name": "phone",
+              "value": "={{ $json.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "77330abe-9cf2-46e8-88b5-11ae7766237f",
+              "name": "interest",
+              "value": "={{ $json.interest }}",
+              "type": "string"
+            },
+            {
+              "id": "1d9f7cdb-d128-4262-90ac-c923087177bd",
+              "name": "source",
+              "value": "={{ $json.source || $('Lead Capture Form').item.json.Source }}",
+              "type": "string"
+            },
+            {
+              "id": "fb4e970d-1b01-4bdb-aeb8-82359a005956",
+              "name": "confidence",
+              "value": "={{ $json.confidence }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "abae8640-ba98-4481-9c74-370fca4ac401",
+      "name": "Shape CRM Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Demo-CRM",
+              "value": "n8n-llm-starter-pack"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { contact: $json, upsert: true, demo: true } }}",
+        "options": {}
+      },
+      "id": "016b3dad-d8db-47f8-a313-4a4b95fd53d2",
+      "name": "HTTP \u00b7 Upsert CRM Stub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        280
+      ],
+      "notes": "Points at httpbin.org echo. Replace with your CRM API + Header Auth / OAuth2 credential.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "81569919-4a5a-4a0f-9fa0-a7525bd8a319",
+              "name": "status",
+              "value": "ok",
+              "type": "string"
+            },
+            {
+              "id": "252bfd3e-d7d1-44af-aab1-6ecb6cf0a201",
+              "name": "normalized",
+              "value": "={{ $('Shape CRM Payload').item.json }}",
+              "type": "object"
+            },
+            {
+              "id": "b74f0556-293d-4a8b-88a4-5ec483998986",
+              "name": "crm_echo",
+              "value": "={{ $json.json || $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a28920fb-cff8-4738-8742-d83beddb9480",
+      "name": "Confirm Upsert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1080,
+        280
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lead Capture Form": {
+      "main": [
+        [
+          {
+            "node": "LLM Normalize Lead Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Normalize Lead Fields": {
+      "main": [
+        [
+          {
+            "node": "Shape CRM Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape CRM Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP \u00b7 Upsert CRM Stub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP \u00b7 Upsert CRM Stub": {
+      "main": [
+        [
+          {
+            "node": "Confirm Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2106eb44-a3d1-4beb-8567-cba7325cb27d",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

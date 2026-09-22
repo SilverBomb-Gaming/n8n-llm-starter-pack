@@ -1,0 +1,37 @@
+# Secrets & local junk
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+credentials*.json
+**/credentials/**
+.n8n/
+n8n-data/
+
+# Credential / workflow dumps that may contain secrets
+*-credentials.json
+credential-export*.json
+workflow-export-with-creds*.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs & caches
+*.log
+npm-debug.log*
+.cache/
+tmp/
+temp/
+
+# Python / node accidental local tooling
+__pycache__/
+node_modules/
+.venv/
+venv/
