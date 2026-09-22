@@ -1,0 +1,208 @@
+{
+  "name": "03 \u00b7 Webhook to Slack (LLM)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 03 \u00b7 Webhook \u2192 Slack\n\n**Clearest demo path (~5 min)**\n1. **Import** `workflows/03-webhook-to-slack.json`\n2. Create/select credentials:\n   - OpenAI account \u2192 node *LLM Format Slack Message*\n   - Slack API \u2192 node *Post to Slack*\n3. Open *Post to Slack* \u2192 pick channel (or set Channel ID)\n4. **Listen for test event** on webhook, or Activate\n5. POST:\n```bash\ncurl -X POST '<WEBHOOK_URL>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"event\":\"deploy\",\"status\":\"success\",\"service\":\"billing-api\",\"detail\":\"v1.4.2 live\"}'\n```\n6. Check Slack + HTTP response\n\nNo secrets in this repo \u2014 see `CREDENTIALS.example.md`.",
+        "height": 520,
+        "width": 520,
+        "color": 3
+      },
+      "id": "21cc19f9-55bc-4d2a-b793-2126e59ccf75",
+      "name": "Note \u2014 Setup Path",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "notify-slack",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "73d46868-520e-4a5e-b2f4-cfe2b372a63a",
+      "name": "Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "325731dc-ee8c-498a-8361-35a93c53cde4",
+      "notes": "Production URL appears after Activate. Use Test URL while building.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7722c7d-c595-4fd7-b09f-3f87310cb55f",
+              "name": "payload",
+              "value": "={{ $json.body || $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "523afea1-130a-4574-b845-7660d3c5147e",
+      "name": "Capture Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You format operational events for Slack. Return ONLY JSON: {\"text\": \"short fallback text\", \"blocks_md\": \"markdown message with emoji, bold service name, status, and one-line detail\"}. Keep under 500 chars. No secrets."
+            },
+            {
+              "role": "user",
+              "content": "=Format this event as a Slack message:\n{{ JSON.stringify($json.payload) }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 350
+        }
+      },
+      "id": "a7306ec3-9bd7-401b-8421-1f48c6995ce0",
+      "name": "LLM Format Slack Message",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "Map this to your OpenAI (or OpenAI-compatible) credential after import.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "id"
+        },
+        "text": "={{ $json.blocks_md || $json.text || $json.message?.content || 'n8n event notification' }}",
+        "otherOptions": {}
+      },
+      "id": "28ad6d5e-307b-41f6-9f05-fbfada32a87f",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      },
+      "notes": "Replace Channel ID (e.g. C0123456789). Bot needs chat:write. Map Slack credential after import.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, posted: true, preview: $('LLM Format Slack Message').item.json } }}",
+        "options": {}
+      },
+      "id": "5be6d333-c1c3-4076-bf56-881dbd598bf8",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1060,
+        300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Capture Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Payload": {
+      "main": [
+        [
+          {
+            "node": "LLM Format Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Format Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Slack": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "27784b8d-d436-4988-81d3-fe2ee231dec4",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

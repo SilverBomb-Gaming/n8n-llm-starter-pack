@@ -1,0 +1,252 @@
+{
+  "name": "04 \u00b7 RSS Digest (LLM)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 04 \u00b7 RSS Digest\n\n**Demo (<10 min)**\n1. Import \u00b7 set OpenAI credential\n2. Optionally change RSS URL on *Fetch RSS Items*\n3. Choose delivery: keep **Email** or disable it and enable **Slack** branch\n4. Click **Execute workflow** (Schedule fires on Activate)\n\nDefault feed is a public example (HN). No private emails in this file \u2014 set your address on *Send Digest Email*.",
+        "height": 380,
+        "width": 460,
+        "color": 6
+      },
+      "id": "e9e806f6-2b65-426e-a266-074ae61af178",
+      "name": "Note \u2014 Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "81ed2a27-6df5-4695-8db5-a23368f484f5",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        280
+      ],
+      "notes": "Runs every 24h when workflow is Active. Use Manual execute for demos.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "https://hnrss.org/frontpage",
+        "options": {}
+      },
+      "id": "2e4062a8-95fe-4ad7-95ad-6be1bdc371ef",
+      "name": "Fetch RSS Items",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 8
+      },
+      "id": "5488f7a7-cacc-4ce4-9787-e95f19c53f1d",
+      "name": "Limit to Top Items",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        460,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "32e10be1-e768-4091-b3fc-4857ee0a4922",
+      "name": "Aggregate Feed Items",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        680,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You write a crisp daily RSS digest for builders. Output Markdown with: title line, 5-8 bullets (title + why it matters + link), and a 2-sentence 'watch next' closer. No fluff."
+            },
+            {
+              "role": "user",
+              "content": "=Digest these items:\n{{ JSON.stringify($json.data || $json, null, 2).slice(0, 14000) }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": false,
+        "options": {
+          "temperature": 0.4,
+          "maxTokens": 900
+        }
+      },
+      "id": "d5f41c8e-b999-479f-a6c2-c6c009dc06f4",
+      "name": "LLM Write Digest",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        920,
+        280
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "Map this to your OpenAI (or OpenAI-compatible) credential after import.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@example.com",
+        "toEmail": "YOU@example.com",
+        "subject": "={{ 'Daily RSS Digest \u2014 ' + $now.toFormat('yyyy-LL-dd') }}",
+        "emailType": "text",
+        "message": "={{ $json.message?.content || $json.text || $json.content || JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "ba8e0b64-d051-4cd0-b3fc-e1a82a7a1adb",
+      "name": "Send Digest Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        200
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP account"
+        }
+      },
+      "notes": "Replace YOU@example.com. Attach SMTP credential. Or disable and use Slack instead.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "id"
+        },
+        "text": "={{ $json.message?.content || $json.text || 'RSS digest ready' }}",
+        "otherOptions": {}
+      },
+      "id": "05aa3bb9-a548-4f90-8406-2600e086ae84",
+      "name": "Optional \u00b7 Post Digest to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        420
+      ],
+      "disabled": true,
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      },
+      "notes": "Disabled by default. Enable and connect from LLM Write Digest if you prefer Slack over email.",
+      "notesInFlow": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch RSS Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch RSS Items": {
+      "main": [
+        [
+          {
+            "node": "Limit to Top Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to Top Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Feed Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Feed Items": {
+      "main": [
+        [
+          {
+            "node": "LLM Write Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Write Digest": {
+      "main": [
+        [
+          {
+            "node": "Send Digest Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7d3c8237-1571-4f2f-8162-6987be93c86e",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
