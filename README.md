@@ -2,6 +2,8 @@
 
 **Alfredo Cardona · [SilverBomb-Gaming](https://github.com/SilverBomb-Gaming)**
 
+WHO THIS IS FOR???
+
 Importable n8n workflows that show practical LLM patterns for AI automation / workflow IC roles: triage, document summary, webhook notifications, RSS digests, and lead normalization.
 
 These are **templates**, not a hosted SaaS. You run them on your own n8n Cloud or self-hosted instance with your own API credentials.
