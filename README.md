@@ -70,7 +70,17 @@ curl -X POST 'https://YOUR_N8N_HOST/webhook-test/notify-slack' \
 
 6. Confirm the Slack message and the JSON response from **Respond OK**.
 
+**Post to Slack → Message Text** must be a string. The LangChain OpenAI node (Output Content as JSON) returns `{ text, blocks_md }` on `message.content` as an object. The imported expression reads `message.content.blocks_md`, then `message.content.text`. Mapping the whole `content` object posts `[object Object]` in Slack.
+
 If Slack is not ready yet, temporarily disable **Post to Slack** and connect **LLM Format Slack Message** → **Respond OK** to inspect the formatted payload only.
+
+### Live demo proof
+
+Captured on **n8n Cloud** after OpenAI and Slack credentials were attached. The shots show the successful canvas and the formatted deploy message only. No secrets are in the images.
+
+![Workflow 03 canvas after a successful run](docs/screenshots/03-canvas-success.png)
+
+![Slack #aie-n8n-demo deploy message for billing-api / Success / v1.4.2](docs/screenshots/03-slack-message.png)
 
 ---
 
@@ -127,6 +137,7 @@ workflows/
   05-form-to-crm.json
 CREDENTIALS.example.md
 docs/architecture.md
+docs/screenshots/
 .gitignore
 README.md
 ```

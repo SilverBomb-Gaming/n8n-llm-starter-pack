@@ -113,7 +113,7 @@
           "value": "YOUR_SLACK_CHANNEL_ID",
           "mode": "id"
         },
-        "text": "={{ $json.blocks_md || $json.text || $json.message?.content || 'n8n event notification' }}",
+        "text": "={{ $json.message.content.blocks_md || $json.message.content.text || 'n8n event notification' }}",
         "otherOptions": {}
       },
       "id": "28ad6d5e-307b-41f6-9f05-fbfada32a87f",
@@ -130,8 +130,24 @@
           "name": "Slack account"
         }
       },
-      "notes": "Replace Channel ID (e.g. C0123456789). Bot needs chat:write. Map Slack credential after import.",
+      "notes": "Replace Channel ID (e.g. C0123456789). Bot needs chat:write. Map Slack credential after import. Message Text must be a string (blocks_md or text), not the whole content object.",
       "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Message Text must be a string\n\nDo not send the whole LLM `content` object — Slack will show `[object Object]`.\n\nWith **Output Content as JSON** on, Message Text is:\n`{{ $json.message.content.blocks_md || $json.message.content.text }}`",
+        "height": 240,
+        "width": 440,
+        "color": 4
+      },
+      "id": "4968e539-c24d-49dd-b8f1-f6c7ebab8636",
+      "name": "Note — Slack text is a string",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        680,
+        500
+      ]
     },
     {
       "parameters": {
